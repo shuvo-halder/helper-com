@@ -30,4 +30,5 @@ echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
 # 7. Update GRUB and initramfs to register the new filesystem layout
 update-grub
+echo "RESUME=none" > /etc/initramfs-tools/conf.d/resume
 update-initramfs -u
