@@ -24,7 +24,7 @@ fallocate -l 1G /swapfile
 chmod 600 /swapfile
 mkswap /swapfile
 swapon /swapfile
-```
+
 # 6. Add the new swap file to fstab to persist across reboots
 echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
@@ -32,3 +32,5 @@ echo '/swapfile none swap sw 0 0' >> /etc/fstab
 update-grub
 echo "RESUME=none" > /etc/initramfs-tools/conf.d/resume
 update-initramfs -u
+
+```
