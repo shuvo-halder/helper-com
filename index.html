@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Welcome</title>
+<style>
+  :root { --g: #00ff9c; --dim: #00ff9c88; --bg: #020a06; }
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  body {
+    background: var(--bg); color: var(--g);
+    font-family: ui-monospace, "Courier New", monospace;
+    -webkit-user-select: none; user-select: none;
+  }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; opacity: .35; }
+
+  /* scanlines + vignette + flicker */
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: 5; pointer-events: none;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,.25) 0 1px, transparent 1px 3px);
+  }
+  body::after {
+    content: ""; position: fixed; inset: 0; z-index: 6; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.75) 100%);
+    animation: flicker 6s infinite;
+  }
+  @keyframes flicker { 0%,95%,100% { opacity: 1; } 96% { opacity: .85; } 97% { opacity: 1; } 98% { opacity: .9; } }
+
+  .wrap {
+    position: relative; z-index: 2; height: 100%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 0 1rem;
+  }
+
+  /* glitch title */
+  h1 {
+    position: relative; margin: 0 0 1.2rem;
+    font-size: clamp(2.2rem, 8vw, 4.5rem); letter-spacing: .15em;
+    text-shadow: 0 0 12px var(--g), 0 0 32px var(--dim);
+  }
+  h1::before, h1::after {
+    content: attr(data-t); position: absolute; left: 0; top: 0; width: 100%;
+    overflow: hidden; clip-path: inset(0 0 0 0);
+  }
+  h1::before { color: #ff2d6f; transform: translateX(-2px); animation: g1 3s infinite; mix-blend-mode: screen; }
+  h1::after  { color: #22d3ee; transform: translateX(2px);  animation: g2 3s infinite; mix-blend-mode: screen; }
+  @keyframes g1 { 0%,90%,100% { clip-path: inset(0 0 100% 0); } 92% { clip-path: inset(20% 0 55% 0); transform: translateX(-5px); } 95% { clip-path: inset(60% 0 10% 0); transform: translateX(3px); } }
+  @keyframes g2 { 0%,90%,100% { clip-path: inset(100% 0 0 0); } 93% { clip-path: inset(50% 0 25% 0); transform: translateX(5px); } 96% { clip-path: inset(10% 0 70% 0); transform: translateX(-3px); } }
+
+  /* terminal box */
+  .term {
+    width: min(92vw, 540px); text-align: left;
+    background: rgba(0,15,8,.7); border: 1px solid var(--dim);
+    border-radius: 6px; box-shadow: 0 0 25px rgba(0,255,156,.15);
+    font-size: clamp(.72rem, 2.5vw, .92rem);
+  }
+  .bar { display: flex; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--dim); }
+  .bar i { width: 10px; height: 10px; border-radius: 50%; background: var(--dim); }
+  .bar span { margin-left: auto; color: var(--dim); font-size: .75rem; }
+  #log { padding: 12px 14px; min-height: 15em; white-space: pre-wrap; line-height: 1.6; word-break: break-word; }
+  .cur { display: inline-block; width: .55em; height: 1em; background: var(--g); vertical-align: text-bottom; animation: bl 1s steps(1) infinite; }
+  @keyframes bl { 50% { opacity: 0; } }
+
+  /* progress */
+  .prog { width: min(92vw, 540px); height: 4px; margin-top: 1rem; background: #00ff9c22; border-radius: 2px; overflow: hidden; }
+  .prog b { display: block; height: 100%; width: 0; background: var(--g); box-shadow: 0 0 10px var(--g); animation: load 5s ease-out forwards; }
+  @keyframes load { to { width: 100%; } }
+
+  /* HUD corners */
+  .hud { position: fixed; z-index: 3; font-size: .7rem; color: var(--dim); letter-spacing: .1em; }
+  .tl { top: 14px; left: 16px; } .tr { top: 14px; right: 16px; text-align: right; }
+  .bl { bottom: 14px; left: 16px; } .br { bottom: 14px; right: 16px; text-align: right; }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--g); margin-right: 6px; animation: pl 1.6s infinite; }
+  @keyframes pl { 50% { opacity: .2; } }
+</style>
+</head>
+<body>
+  <canvas id="rain"></canvas>
+
+  <div class="hud tl"><span class="dot"></span>SYS: ONLINE</div>
+  <div class="hud tr">ENCRYPTION: ACTIVE</div>
+  <div class="hud bl">ACCESS: RESTRICTED</div>
+  <div class="hud br" id="clock">--:--:--</div>
+
+  <div class="wrap">
+    <h1 data-t="WELCOME">WELCOME</h1>
+    <div class="term">
+      <div class="bar"><i></i><i></i><i></i><span>guest@localhost</span></div>
+      <div id="log"></div>
+    </div>
+    <div class="prog"><b></b></div>
+  </div>
+
+<script>
+  // ---------- Matrix rain ----------
+  const cv = document.getElementById('rain'), ctx = cv.getContext('2d');
+  const chars = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿ0123456789ABCDEF<>/{}[]$#';
+  let cols, drops, fs = 16;
+  function init() {
+    cv.width = innerWidth; cv.height = innerHeight;
+    cols = Math.floor(cv.width / fs);
+    drops = Array.from({ length: cols }, () => Math.random() * -50);
+  }
+  addEventListener('resize', init); init();
+  function rain() {
+    ctx.fillStyle = 'rgba(2,10,6,.08)';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = '#00ff9c'; ctx.font = fs + 'px monospace';
+    for (let i = 0; i < cols; i++) {
+      ctx.fillText(chars[Math.floor(Math.random() * chars.length)], i * fs, drops[i] * fs);
+      if (drops[i] * fs > cv.height && Math.random() > .975) drops[i] = 0;
+      drops[i]++;
+    }
+  }
+  setInterval(rain, 55);
+
+  // ---------- Helpers ----------
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const pad = (k, v) => ('$ ' + k + ' ').padEnd(18, '.') + ' ' + v;
+
+  function getOS() {
+    const u = navigator.userAgent;
+    if (/Windows/i.test(u)) return 'Windows';
+    if (/Android/i.test(u)) return 'Android';
+    if (/iPhone|iPad|iPod/i.test(u)) return 'iOS';
+    if (/Mac/i.test(u)) return 'macOS';
+    if (/CrOS/i.test(u)) return 'ChromeOS';
+    if (/Linux/i.test(u)) return 'Linux';
+    return 'Unknown';
+  }
+  function getBrowser() {
+    const u = navigator.userAgent;
+    if (/Edg\//.test(u)) return 'Edge';
+    if (/OPR\//.test(u)) return 'Opera';
+    if (/Chrome\//.test(u)) return 'Chrome';
+    if (/Firefox\//.test(u)) return 'Firefox';
+    if (/Safari\//.test(u)) return 'Safari';
+    return 'Unknown';
+  }
+  async function ping() {
+    // warm-up (connection setup time bad dewa)
+    try { await fetch('/api/ping?_=' + Math.random(), { cache: 'no-store' }); } catch (e) {}
+    const t = [];
+    for (let i = 0; i < 4; i++) {
+      const s = performance.now();
+      try { await fetch('/api/ping?_=' + Math.random(), { cache: 'no-store' }); } catch (e) { continue; }
+      t.push(performance.now() - s);
+    }
+    if (!t.length) return '--';
+    return Math.round(t.reduce((a, b) => a + b) / t.length);
+  }
+  async function getIP() {
+    try { return (await (await fetch('/api/ip', { cache: 'no-store' })).text()).trim(); }
+    catch (e) { return 'unknown'; }
+  }
+  async function getGeo() {
+    try {
+      const ctl = new AbortController();
+      const to = setTimeout(() => ctl.abort(), 4000);
+      const g = await (await fetch('https://ipwho.is/', { signal: ctl.signal })).json();
+      clearTimeout(to);
+      if (g.success) {
+        return {
+          loc: [g.city, g.country].filter(Boolean).join(', ') || 'unknown',
+          isp: (g.connection && g.connection.isp) || 'unknown'
+        };
+      }
+    } catch (e) {}
+    return { loc: 'unavailable', isp: 'unavailable' };
+  }
+
+  // ---------- Terminal typing ----------
+  const log = document.getElementById('log');
+  let lines = [], li = 0, ci = 0, out = '';
+  function typeLine() {
+    if (li >= lines.length) { log.innerHTML = esc(out) + '<span class="cur"></span>'; return; }
+    const l = lines[li];
+    log.innerHTML = esc(out + l.slice(0, ci)) + '<span class="cur"></span>';
+    if (ci < l.length) { ci++; setTimeout(typeLine, 14 + Math.random() * 26); }
+    else { out += l + '\n'; li++; ci = 0; setTimeout(typeLine, 280); }
+  }
+
+  async function start() {
+    log.innerHTML = '<span class="cur"></span>';
+    const [ip, geo, ms] = await Promise.all([getIP(), getGeo(), ping()]);
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown';
+
+    lines = [
+      '$ initializing secure session...',
+      pad('visitor ip', ip),
+      pad('location', geo.loc),
+      pad('isp', geo.isp),
+      pad('os', getOS()),
+      pad('browser', getBrowser()),
+      pad('screen', screen.width + 'x' + screen.height),
+      pad('language', navigator.language || 'unknown'),
+      pad('timezone', tz),
+      pad('latency', ms + ' ms'),
+      '$ access level: GUEST',
+      '$ nothing to see here_'
+    ];
+    typeLine();
+  }
+  setTimeout(start, 500);
+
+  // ---------- Clock (visitor's own browser time) ----------
+  const clk = document.getElementById('clock');
+  const tick = () => { clk.textContent = new Date().toLocaleTimeString('en-GB'); };
+  tick(); setInterval(tick, 1000);
+
+  // ---------- Right click / inspect block ----------
+  document.addEventListener('contextmenu', e => e.preventDefault());
+  document.addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    if (e.key === 'F12' ||
+        (e.ctrlKey && e.shiftKey && ['i','j','c'].includes(k)) ||
+        (e.ctrlKey && ['u','s'].includes(k)) ||
+        (e.metaKey && e.altKey && ['i','j','c'].includes(k))) {
+      e.preventDefault(); return false;
+    }
+  });
+</script>
+</body>
+</html>
