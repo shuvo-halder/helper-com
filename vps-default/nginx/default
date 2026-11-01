@@ -1,0 +1,50 @@
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    root /var/www/html;
+    index index.html;
+
+    # custom 404
+#    error_page 404 /404.html;
+#    location = /404.html {
+#        internal;
+#    }
+
+    # certbot (webroot) er jonno, hidden-file block er AGE thakte hobe
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/html;
+        allow all;
+    }
+
+    # welcome page
+    location = / {
+        try_files /index.html =404;
+    }
+
+    # visitor info endpoints
+    location = /api/ip {
+        default_type text/plain;
+        add_header Cache-Control "no-store";
+        return 200 $remote_addr;
+    }
+
+    location = /api/ping {
+        default_type text/plain;
+        add_header Cache-Control "no-store";
+        return 200 "pong";
+    }
+
+
+    # hidden file (.git, .env, .ht*) block
+    location ~ /\. {
+        deny all;
+        return 404;
+    }
+
+    # onno shob kichu 404
+    location / {
+        return 404;
+    }
+}
