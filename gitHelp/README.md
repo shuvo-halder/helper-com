@@ -1,18 +1,18 @@
-# Git Helpers & Workflow Recipes
+# Git Helpers and Workflow Recipes
 
-This folder contains references and step-by-step guides for Git configuration, repository initialization, and common version control workflows.
+This directory contains command references, standard configurations, and workflow recipes for version control using Git.
 
 ---
 
 ## Documents in This Folder
 
-- [**`git-global-configure.md`**](git-global-configure.md): Configuring Git author identity (`user.name` and `user.email`) at the global system level or locally per repository.
-- [**`git-help.md`**](git-help.md): Initializing a new repository (`git init`), staging files, creating the initial commit, renaming the default branch, adding remote origins, and pushing upstream.
+- [**`git-global-configure.md`**](git-global-configure.md): Configuring commit author identity (`user.name` and `user.email`), privacy proxy emails, default branch settings (`init.defaultBranch`), line-ending conversions (`core.autocrlf`), pull rebase strategies, and productivity aliases.
+- [**`git-help.md`**](git-help.md): Comprehensive command reference for repository setup, daily staging/committing workflows, branching, remote collaboration, undo and recovery recipes (`restore`, `revert`, `reset`, `reflog`), `.gitignore` rules, and commit message conventions.
 
 ---
 
 ## How to Use These Guides
 
-1. **Identity Setup**: Run the global configuration once on any new workstation or server before committing code to ensure consistent commit authorship.
-2. **Repository Workflow**: Follow the initialization recipe when onboarding a new project to remote hosting platforms like GitHub, GitLab, or Gitea.
-3. **Safety**: Commands are non-destructive and copy-paste safe. Always replace placeholders such as `<your_name>`, `<your_email>`, and `<repository_url>` with your own details.
+1. **Initial Setup**: Run global identity and default branch configuration on any new development machine or CI/CD runner before creating commits.
+2. **Credential Safety**: Never embed authentication tokens or passwords in remote repository URLs; use SSH keys or a system credential helper.
+3. **Recovery Procedures**: When undoing mistakes, prefer safe non-destructive commands (`git restore`, `git revert`) over destructive commands (`git reset --hard`, `git push --force`).
