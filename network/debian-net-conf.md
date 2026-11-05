@@ -1,29 +1,48 @@
-আপনার screenshot অনুযায়ী Debian 12 এখন `/etc/network/interfaces` ব্যবহার করছে এবং interface হলো `enp0s3`।
+# Debian Static Network Configuration
 
-বর্তমান config:
+> **Note**: An original Bengali version of this guide is available at [debian-net-conf.bn.md](debian-net-conf.bn.md).
+
+This guide describes how to configure a static IPv4 address on Debian using `/etc/network/interfaces` (`ifupdown`).
+
+---
+
+## 1. Verify Current Network Configuration
+
+Before modifying any configuration files, check your active interface name, IP address, and default gateway to avoid getting locked out over SSH:
+
+```bash
+# Identify your active interface and current IP
+ip addr show enp0s3
+
+# Identify your current default gateway
+ip route
+```
+
+---
+
+## 2. Default Dynamic (DHCP) Configuration
+
+In Debian, a default dynamic interface configuration typically looks like this:
 
 ```ini
 allow-hotplug enp0s3
 iface enp0s3 inet dhcp
 ```
 
-এটাকে static IP করতে হবে।
+---
 
-ধরি:
+## 3. Static IP Configuration Example
 
-* IP: `192.168.1.100`
-* Netmask: `255.255.255.0`
-* Gateway: `192.168.1.1`
-* DNS: `1.1.1.1`, `8.8.8.8`
-
-তাহলে file হবে:
+To convert the interface to a static IP address, edit `/etc/network/interfaces`:
 
 ```ini
 source /etc/network/interfaces.d/*
 
+# Loopback network interface
 auto lo
 iface lo inet loopback
 
+# Primary network interface
 allow-hotplug enp0s3
 iface enp0s3 inet static
     address 192.168.1.100
@@ -31,28 +50,24 @@ iface enp0s3 inet static
     gateway 192.168.1.1
     dns-nameservers 1.1.1.1 8.8.8.8
 
+# IPv6 auto configuration (optional)
 iface enp0s3 inet6 auto
 ```
 
-Save করে apply করুন:
+> **Warning**: Ensure the `address`, `netmask`, and `gateway` match your actual network subnet before applying. Incorrect values will terminate active SSH sessions.
+
+---
+
+## 4. Apply Network Configuration
+
+Apply the new settings using systemd:
 
 ```bash
 sudo systemctl restart networking
 ```
 
-অথবা:
+Alternatively, cycle the individual interface:
 
 ```bash
 sudo ifdown enp0s3 && sudo ifup enp0s3
 ```
-
-**কিন্তু IP, Gateway, Netmask না জেনে edit করবেন না**, না হলে SSH connection কেটে যেতে পারে।
-
-আগে এই command দুটার output দিন:
-
-```bash
-ip addr show enp0s3
-ip route
-```
-
-বিশেষ করে `ip route` এর output থেকে আমি আপনার বর্তমান gateway দেখে exact config লিখে দিতে পারব।
