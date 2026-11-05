@@ -19,5 +19,5 @@ This folder contains configuration guides, troubleshooting workflows, and cloud-
    ip -brief addr
    ip route
    ```
-2. **Prevent Remote Lockouts**: Modifying network interfaces over SSH carries lockout risks. Always schedule an automatic rollback (`sudo shutdown -r +5`) before applying unverified changes, and cycle interfaces atomically (`sudo ifdown <INTERFACE> && sudo ifup <INTERFACE>`).
+2. **Prevent Remote Lockouts**: Modifying network interfaces over SSH carries lockout risks. Always backup configurations (`cp file file.bak`) and schedule an automatic restore (e.g. via `at now + 5 minutes`) before applying unverified changes, and run interface cycling commands inside a persistent session (`tmux` or `screen`) or `nohup` rather than an unprotected SSH session.
 3. **Cloud Virtual Machines**: If your static IP configuration reverts to DHCP following a server reboot, refer to `static-ip-fails.md` to configure cloud-init overrides.

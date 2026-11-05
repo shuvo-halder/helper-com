@@ -11,16 +11,26 @@ This guide describes how to configure dynamic (DHCP) and static IPv4 addresses o
 > Changing an IP address, netmask, or default gateway on a remote server over SSH carries a high risk of **immediate lockout**. If the new configuration fails to initialize or contains an unreachable gateway, the SSH session will freeze and drop.
 >
 > 1. **Ensure Out-of-Band Access**: Always verify you have access to a provider web console, IPMI, iDRAC, or VNC before modifying interface files.
-> 2. **Schedule an Auto-Revert Safety Net**: Before applying network changes over SSH, schedule an automated reboot to restore connectivity if you lose access:
->    ```bash
->    # Schedule a reboot in 5 minutes as a fallback
->    sudo shutdown -r +5 "Reverting network changes in 5 minutes if disconnected"
->    ```
->    If the changes succeed and you maintain SSH connectivity, cancel the scheduled reboot:
->    ```bash
->    sudo shutdown -c
->    ```
-> 3. **Chain Interface Cycling**: Never run `ifdown` as an isolated command over SSH. Always chain it with `ifup`: `sudo ifdown <INTERFACE> && sudo ifup <INTERFACE>`.
+> 2. **Create a Real Safety Net (Automated Rollback)**:
+>    - First, backup the current working configuration:
+>      ```bash
+>      sudo cp /etc/network/interfaces /etc/network/interfaces.bak
+>      ```
+>    - Schedule an automatic restore before applying changes using `at`:
+>      ```bash
+>      # Schedule automatic rollback in 5 minutes via 'at'
+>      echo "cp /etc/network/interfaces.bak /etc/network/interfaces && systemctl restart networking" | sudo at now + 5 minutes
+>      ```
+>      *(If `at` is unavailable, use a detached background timer: `nohup sh -c 'sleep 300 && cp /etc/network/interfaces.bak /etc/network/interfaces && systemctl restart networking' >/dev/null 2>&1 &`)*
+>    - Test your connectivity. Once access and settings are confirmed, cancel the scheduled restore:
+>      ```bash
+>      # List jobs with atq, then remove the pending rollback job
+>      atq
+>      sudo atrm <JOB_ID>
+>      ```
+>      *(If you also scheduled a reboot via `sudo shutdown -r +5` as an emergency fallback, cancel it with `sudo shutdown -c`)*
+> 3. **Run Interface Cycling in a Persistent Session**:
+>    Never execute `ifdown` as a bare command over SSH. Even when chained (`ifdown && ifup`), the SSH connection can terminate between the two commands if network routing is interrupted. Always run interface cycling inside `tmux`, `screen`, `nohup`, or directly from the out-of-band console.
 
 ---
 
@@ -149,18 +159,19 @@ sudo systemctl restart networking
 ---
 
 ### ifdown and ifup
-Cycle a specific network interface down and back up in an atomic shell execution.
+Cycle a specific network interface down and back up. Run inside tmux, screen, nohup, or directly from the console.
 ```bash
 sudo ifdown <INTERFACE> && sudo ifup <INTERFACE>
 ```
 
 #### Real-World Example
 ```bash
+# Run inside tmux or nohup to prevent disconnect between commands
 sudo ifdown eth0 && sudo ifup eth0
 ```
 
 > [!WARNING]
-> Always execute `ifdown` and `ifup` on a single line connected with `&&`. Executing `sudo ifdown <INTERFACE>` alone over an SSH connection immediately shuts down the interface, disconnecting your session permanently.
+> Do not execute `ifdown && ifup` directly in an unprotected remote SSH session. An SSH connection can drop between `ifdown` and `ifup` if network routing drops before `ifup` begins. Always execute interface cycling inside a terminal multiplexer (`tmux` or `screen`), via `nohup`, or directly from an out-of-band management console.
 
 ---
 
@@ -239,11 +250,11 @@ sudo ss -tulpn | grep -E ':(22|80|443)'
 
 | Distribution | Configuration Framework | Primary Configuration File / Path | Apply Command |
 |---|---|---|---|
-| **Debian** | `ifupdown` | `/etc/network/interfaces` | `sudo ifdown <INTERFACE> && sudo ifup <INTERFACE>` or `sudo systemctl restart networking` |
-| **Ubuntu** | Netplan | `/etc/netplan/*.yaml` | `sudo netplan try` (with timeout rollback) before `sudo netplan apply` |
-| **RHEL / Rocky / AlmaLinux** | NetworkManager (`nmcli`) | `/etc/NetworkManager/system-connections/` | `sudo nmcli connection reload && sudo nmcli connection up <INTERFACE>` |
+| **Debian** | `ifupdown` | `/etc/network/interfaces` | Run inside tmux/nohup: `sudo ifdown <INTERFACE> && sudo ifup <INTERFACE>` or `sudo systemctl restart networking` |
+| **Ubuntu** | Netplan <!-- VERIFY: version differences --> | `/etc/netplan/*.yaml` | `sudo netplan try` (with timeout rollback) before `sudo netplan apply` |
+| **RHEL / Rocky / AlmaLinux** | NetworkManager (`nmcli`) <!-- VERIFY: version differences --> | `/etc/NetworkManager/system-connections/` | `sudo nmcli connection reload && sudo nmcli connection up <INTERFACE>` |
 
-#### Ubuntu Netplan Example (`/etc/netplan/01-netcfg.yaml`)
+#### Ubuntu Netplan Example (`/etc/netplan/01-netcfg.yaml`) <!-- VERIFY: version differences -->
 ```yaml
 network:
   version: 2
@@ -265,7 +276,7 @@ To safely test Netplan without risking lockout:
 sudo netplan try
 ```
 
-#### RHEL / Rocky `nmcli` Static IP Example
+#### RHEL / Rocky `nmcli` Static IP Example <!-- VERIFY: version differences -->
 ```bash
 # Configure static IP, gateway, and DNS on connection eth0
 sudo nmcli connection modify eth0 ipv4.addresses 192.0.2.50/24
