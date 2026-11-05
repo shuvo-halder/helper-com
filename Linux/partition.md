@@ -1,8 +1,7 @@
 
-root parttation / is alwars begining partiion and 
+root partition / is always beginning partition and 
 
-/swap logical partation
+/swap logical partition
 
-/home logical partation
-
+/home logical partition
 

@@ -152,13 +152,13 @@ The following security issues were identified in `AUDIT.md` and are scheduled fo
   ```
 - **Risk**: Teaches users to deploy accounts with weak default credentials (`'password'`) and creates superusers capable of dropping all databases on the server.
 - **Proposed Phase 3 Fix**:
-  - Provide a scoped, production-grade example using strong credential placeholders:
+  - Use **ONLY generic placeholders** (`<DB_USER>`, `<DB_PASSWORD>`, `<DB_NAME>`). Never generate, write, or suggest any real-looking passwords:
     ```sql
-    -- Create user with secure password
-    CREATE USER '<DB_USER>'@'localhost' IDENTIFIED BY '<SECURE_PASSWORD>';
+    -- Create user with secure password placeholder
+    CREATE USER '<DB_USER>'@'localhost' IDENTIFIED BY '<DB_PASSWORD>';
 
     -- Grant scoped permissions only to the application database
-    GRANT ALL PRIVILEGES ON <DATABASE_NAME>.* TO '<DB_USER>'@'localhost';
+    GRANT ALL PRIVILEGES ON <DB_NAME>.* TO '<DB_USER>'@'localhost';
 
     -- Apply privilege changes
     FLUSH PRIVILEGES;
@@ -199,9 +199,9 @@ The following security issues were identified in `AUDIT.md` and are scheduled fo
   ```
 - **Risk**: If run on a system with a different partition table layout (e.g. partition 2 is root or swap is on partition 3), this script will permanently delete critical partitions and cause immediate unrecoverable data loss.
 - **Proposed Phase 3 Fix**:
-  - Add a high-visibility `⚠️ Warning` and danger disclaimer at the top of `volume-swap/debian.md`.
-  - Provide safe, interactive verification steps (`lsblk`, `fdisk -l /dev/vda`) before performing partition changes.
-  - Recommend modern tools (`growpart` / `parted`) that do not require destructive raw sector piping.
+  - **Preserve Original Content**: Keep the original scripted `fdisk` piped sequence in `volume-swap/debian.md` under a clearly marked `⚠️ Legacy / Dangerous (Do Not Run Blindly)` section. Do not delete the original content.
+  - **Add Safer Method Above**: Provide a safer, recommended modern workflow using `growpart` and interactive inspection commands (`lsblk`, `fdisk -l /dev/vda`) **ABOVE** the legacy snippet.
+  - Document prerequisites, disk sector verification, and safety backups before touching partition tables.
 
 ---
 
