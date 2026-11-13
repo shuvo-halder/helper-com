@@ -1,0 +1,80 @@
+name: Documentation Quality & Linting
+
+on:
+  push:
+    branches:
+      - main
+      - docs/upgrade
+  pull_request:
+    branches:
+      - main
+      - docs/upgrade
+
+jobs:
+  link-and-fence-check:
+    name: Internal Links & Code Fence Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Validate Markdown Links and Code Fences
+        run: |
+          python -c "
+          import os, sys, re, glob
+
+          md_files = glob.glob('**/*.md', recursive=True)
+          print(f'Checking {len(md_files)} markdown files...')
+
+          errors = []
+
+          for p in sorted(md_files):
+              with open(p, 'r', encoding='utf-8') as f:
+                  lines = f.readlines()
+
+              # Check balanced code fences
+              fences = [l for l in lines if l.strip().startswith('```')]
+              if len(fences) % 2 != 0:
+                  errors.append(f'Unbalanced code fences in {p} (count: {len(fences)})')
+
+              # Check internal relative links
+              content = ''.join(lines)
+              links = re.findall(r'\[([^\]]+)\]\(([^)]+)\)', content)
+              for text, link in links:
+                  if link.startswith('http') or link.startswith('#') or link.startswith('mailto:'):
+                      continue
+                  clean_link = link.split('#')[0]
+                  if not clean_link:
+                      continue
+                  target_path = os.path.normpath(os.path.join(os.path.dirname(p), clean_link))
+                  if not os.path.exists(target_path):
+                      errors.append(f'Dead relative link in {p}: \"{link}\" -> \"{target_path}\"')
+
+          if errors:
+              print('\n--- QUALITY CHECK FAILED ---')
+              for err in errors:
+                  print(f'  [ERROR] {err}')
+              sys.exit(1)
+          else:
+              print('\n[SUCCESS] All code fences balanced and all relative links exist.')
+          "
+
+  markdown-lint:
+    name: Markdown Syntax Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Run markdownlint
+        uses: DavidAnson/markdownlint-cli2-action@v16
+        with:
+          globs: |
+            **/*.md
+            !**/*.bn.md
+        continue-on-error: true

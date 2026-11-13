@@ -1,9 +1,9 @@
 # Repository Structure & Architecture (`STRUCTURE.md`)
 
-**Date**: November 5, 2026  
+**Date**: November 14, 2026  
 **Repository**: `helper-com`  
 **Branch**: `docs/upgrade`  
-**Phase**: Phase 1 (Structure & Layout)
+**Phase**: Phase 4 (Quality & Tooling)
 
 ---
 
@@ -23,10 +23,16 @@ This repository is structured as a modular, copy-paste-safe Linux administration
 
 ```text
 helper-com/
+├── .github/
+│   └── workflows/
+│       └── markdownlint.yml             # Automated Markdown & link validation workflow
+├── .gitignore                           # Excludes OS files, editor dumps, and audit artifacts
 ├── AUDIT.md                             # Comprehensive repository security & content audit
-├── STRUCTURE.md                         # Architecture, rename mapping, and security plan
+├── CHANGELOG.md                         # Detailed version changelog (Phases 0-4)
+├── CONTRIBUTING.md                      # Safety principles, formatting standards, and PR checklist
 ├── LICENSE                              # MIT License
 ├── README.md                            # Central reference, index, and navigation handbook
+├── STRUCTURE.md                         # Architecture, rename mapping, and security plan
 │
 ├── Linux/                               # Core Linux OS administration
 │   ├── README.md                        # Folder overview & quick index
@@ -46,7 +52,8 @@ helper-com/
 │
 ├── PHP/                                 # PHP administration & CLI tools
 │   ├── README.md                        # Folder overview & security guidance
-│   └── make_hash.php                    # CLI password hashing script (bcrypt / Argon2id)
+│   ├── make_hash.php                    # CLI password hashing script (bcrypt / Argon2id)
+│   └── php-fpm-tuning.md                # PHP-FPM memory sizing, pool tuning & php.ini security
 │
 ├── network/                             # Networking, static interfaces, and cloud-init
 │   ├── README.md                        # Folder overview & quick index
