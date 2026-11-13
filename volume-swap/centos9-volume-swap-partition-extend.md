@@ -1,164 +1,168 @@
-Alright brother, you want to **extend the root LV (`cs-root`) but keep 6 GB free** for swap or other use.
-According to your current `lsblk` output:
+# Extending LVM Root and Swap Volumes on CentOS / RHEL 9
 
-```
-vda 100G
-├─vda1 1G /boot
-└─vda2 29G
-   ├─cs-root 27G /
-   └─cs-swap 2G
-```
+On CentOS Stream 9, RHEL 9, and Rocky Linux 9, default installations typically allocate disk storage into an LVM (Logical Volume Manager) Volume Group containing a root logical volume (`root` or `cs-root`) and a swap logical volume (`swap` or `cs-swap`).
 
-You have **about 71 GB of free space after the `/dev/vda2` partition** (100 G – 1 G – 29 G ≈ 70 G).
+This guide details how to expand the underlying physical disk partition, grow the Physical Volume (PV), extend the root Logical Volume (LV), and safely resize the swap Logical Volume.
 
 ---
 
-### **Step 1: Grow the physical partition (`/dev/vda2`)**
+> [!WARNING]
+> ### Pre-Flight Safety Warnings
+> 1. **Hypervisor Snapshot**: Always capture a VM snapshot or cloud volume backup before resizing partitions.
+> 2. **Memory Headroom Before `swapoff`**: Disabling swap to resize it requires available physical RAM to absorb all active swapped pages. Check available RAM with `free -h` first; if memory is saturated, running `swapoff` can trigger the kernel Out-Of-Memory (OOM) killer.
+> 3. **XFS Filesystem Growth Only**: The default root filesystem on RHEL/CentOS 9 is XFS, which **cannot be reduced in size**.
 
-First, you need to expand the partition so that the LVM Physical Volume can use the additional space.
-On CentOS 9, you can use `growpart`.
-If it’s not installed, install it with:
+---
+
+## Baseline Layout Inspection
+
+Verify your current disk partitioning, volume groups, and filesystem types:
 
 ```bash
-sudo dnf install cloud-utils-growpart -y
+lsblk
+sudo pvs
+sudo vgs
+sudo lvs
 ```
 
-Then run:
+*Typical default CentOS 9 layout on a 100 GiB virtual disk*:
+```text
+vda 100G
+├─vda1    1G  /boot (XFS)
+└─vda2   29G  LVM2_member
+   ├─cs-root 27G / (XFS)
+   └─cs-swap  2G [SWAP]
+```
+In this scenario, after expanding the hypervisor disk from 30 GiB to 100 GiB, approximately 70 GiB of unallocated disk space follows `/dev/vda2`.
 
+---
+
+## Part 1: Expand Partition and Physical Volume (PV)
+
+### 1. growpart (expand partition)
+Extend partition 2 live to consume all remaining unallocated disk space on `/dev/vda`.
 ```bash
 sudo growpart /dev/vda 2
 ```
 
-> If the partition doesn’t grow successfully, you might need to free or remove another partition (like swap).
-> In your case, there’s nothing after `/dev/vda2`, so it should grow easily.
+#### Distro Package Requirement
+If `growpart` is not found, install the RHEL package:
+```bash
+sudo dnf install -y cloud-utils-growpart
+```
 
 ---
 
-### **Step 2: Resize the PV (Physical Volume)**
-
+### 2. pvresize (update LVM physical volume)
+Update LVM metadata to recognize the enlarged capacity of the underlying physical partition.
 ```bash
 sudo pvresize /dev/vda2
 ```
 
-Now the LVM Physical Volume will recognize the newly added free space.
+#### Real-World Example
+```bash
+sudo pvresize /dev/vda2
+# Verify unallocated space in Volume Group:
+sudo vgs
+```
 
 ---
 
-### **Step 3: Extend the LV but leave 6 GB free**
+## Part 2: Extend the Root Logical Volume (`cs-root`)
 
-1. Check how much free space is available in the volume group:
-
+### lvextend (root volume)
+Allocate free Volume Group extents to the root logical volume.
 ```bash
-sudo vgdisplay cs | grep "Free  PE / Size"
+sudo lvextend -L +<SIZE>G /dev/<VG_NAME>/<ROOT_LV>
 ```
 
-Suppose it shows about 70 GB free.
-To leave 6 GB unused, extend your root LV by 64 GB:
+#### Flags
+| Flag | Description |
+|---|---|
+| `-L +<SIZE>G` | Add specified gigabytes to the logical volume |
+| `-l +100%FREE` | Allocate all remaining free extents in the Volume Group |
+| `-r`, `--resizefs` | Automatically resize the underlying filesystem |
 
+#### Real-World Example: Adding 64 GiB (Leaving 6 GiB for Swap)
 ```bash
+# Check available free space in Volume Group
+sudo vgdisplay cs | grep "Free  PE / Size"
+
+# Extend root LV by 64 GiB, keeping remaining capacity for swap
 sudo lvextend -L +64G /dev/cs/root
 ```
 
-* `+64G` = total free space − 6 GB
-
 ---
 
-### **Step 4: Resize the filesystem**
+## Part 3: Resize the Root Filesystem
 
-If your root filesystem is **XFS** (default on CentOS 9):
-
+### xfs_growfs (grow XFS root filesystem)
+Enlarge the XFS filesystem online using the root mount point (`/`).
 ```bash
 sudo xfs_growfs /
 ```
 
-If it’s **ext4**, use:
-
+#### Alternative: ext4 Filesystems
+If the root filesystem was formatted with `ext4` rather than XFS:
 ```bash
 sudo resize2fs /dev/cs/root
 ```
 
 ---
 
-### ✅ **Summary**
+## Part 4: Safely Expand the Swap Logical Volume (`cs-swap`)
 
-* After extending the root LV, 6 GB of free space will remain in the Volume Group.
-* You can later use that free 6 GB to **expand the swap LV** or **create a new LV**.
+Unlike standard filesystems, swap logical volumes must be temporarily deactivated, resized, reformatted with `mkswap`, and re-enabled.
 
----
-
-If you want, I can write an **exact ready-to-copy command sequence** that safely extends your root while keeping exactly 6 GB free.
-Would you like me to do that?
-
-
-
-Yes brother, you **can add 6 GB of free space to `/dev/cs/swap`**, but you need to be a little careful. Since swap is a **logical volume**, you must use LVM commands to increase its size.
-
-Your current setup looks like this:
-
-```
-/dev/cs/root 27G  /
-/dev/cs/swap 2G
-Free in VG: 6G
-```
-
----
-
-### **Step 1: Turn off swap**
-
-First, disable the swap space:
+### Step 1: Deactivate Swap Space
+Check that available physical RAM exceeds active swap consumption (`free -h`), then disable the swap logical volume:
 
 ```bash
 sudo swapoff /dev/cs/swap
 ```
 
+> [!WARNING]
+> If available physical RAM is less than active swap usage, `swapoff` will freeze or trigger OOM process termination. Free up memory or stop non-essential services before disabling swap.
+
 ---
 
-### **Step 2: Resize the logical volume**
-
-To add 6 GB:
+### Step 2: Extend the Swap Logical Volume
+Allocate the remaining free space in the Volume Group (e.g. 6 GiB) to the swap LV:
 
 ```bash
 sudo lvextend -L +6G /dev/cs/swap
+# Or allocate all remaining space:
+# sudo lvextend -l +100%FREE /dev/cs/swap
 ```
-
-* Now the swap LV will become 8 GB (2G + 6G)
 
 ---
 
-### **Step 3: Format the swap**
+### Step 3: Reformat the Swap Volume
 
-After enlarging the swap LV, you must reformat it:
+### mkswap
+Re-initialize the swap signature and UUID on the enlarged logical volume.
+```bash
+sudo mkswap /dev/cs/swap
+```
 
+#### Real-World Example
 ```bash
 sudo mkswap /dev/cs/swap
 ```
 
 ---
 
-### **Step 4: Enable swap**
+### Step 4: Re-Enable and Verify Swap
 
+### swapon
+Re-activate the enlarged swap volume live.
 ```bash
 sudo swapon /dev/cs/swap
 ```
 
-* Verify it:
-
+#### Verification
 ```bash
 swapon --show
 free -h
 ```
-
-* `/dev/cs/swap` should now show as 8 GB.
-
----
-
-### ✅ **Important Notes**
-
-* **You must turn off the swap before resizing the LV.**
-* Unlike a normal filesystem, you always need to run `mkswap` after resizing a swap LV.
-* `/etc/fstab` stays the same — the new swap will automatically activate on boot.
-
----
-
-If you want, I can write a **ready-to-copy command sequence** that safely expands `/dev/cs/swap` to 8 GB.
-Would you like me to do that?
+*Note*: Existing `/etc/fstab` entries remain unchanged because the device path `/dev/cs/swap` persists across resizing.
