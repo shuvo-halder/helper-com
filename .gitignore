@@ -1,0 +1,46 @@
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+
+# Editor & IDE Directories
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+*.bak
+
+# Incident Response & Audit Evidence Artifacts
+security_audit/
+security_audit_*/
+incident_audit_*/
+quarantine/
+quarantined_samples.tar.gz
+evidence_*.tar.gz
+*.sha256
+*.audit
+
+# Temporary & Log Files
+*.log
+*.tmp
+*.pid
+/tmp/
+
+# Sensitive Files & Local Overrides (Defense in Depth)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+id_rsa
+id_ed25519
+hs_ed25519_secret_key

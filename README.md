@@ -945,11 +945,9 @@ To quickly search for a command in this reference:
 
 ## Contributing
 
-Contributions, fixes, and improvements are welcome! Please adhere to these guidelines:
-1. Ensure all commands are copy-paste safe and include a one-line description.
-2. Mark destructive or high-risk commands with a `> [!WARNING]` alert and a safer alternative.
-3. If unsure about specific distribution flags or options, mark the entry `<!-- VERIFY -->` rather than guessing.
-4. Use standard Markdown formatting and test relative links.
+Contributions, fixes, and improvements are welcome! Please read our [**Contributing Guide**](CONTRIBUTING.md) for full details on safety rules, command formatting requirements, placeholder conventions, and the pull request process.
+
+See [**`CHANGELOG.md`**](CHANGELOG.md) for recent release notes and migration history.
 
 ---
 
