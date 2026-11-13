@@ -138,7 +138,7 @@
     return 'Unknown';
   }
   async function ping() {
-    // warm-up (connection setup time bad dewa)
+    // warm-up (ignore initial connection setup latency)
     try { await fetch('/api/ping?_=' + Math.random(), { cache: 'no-store' }); } catch (e) {}
     const t = [];
     for (let i = 0; i < 4; i++) {
