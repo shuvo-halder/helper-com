@@ -1,0 +1,9 @@
+[Unit]
+Description=Run tenant SSL sync every minute
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+
+[Install]
+WantedBy=timers.target
