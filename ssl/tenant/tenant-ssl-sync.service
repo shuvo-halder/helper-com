@@ -1,0 +1,6 @@
+[Unit]
+Description=Sync tenant SSL certificates
+
+[Service]
+Type=oneshot
+ExecStart=/opt/tenant/sync-tenant-ssl.sh
